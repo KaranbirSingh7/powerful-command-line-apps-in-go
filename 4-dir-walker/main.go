@@ -14,23 +14,28 @@ type config struct {
 	ext string
 
 	// minimum file size
-	min int64
+	size int64
 
 	// list files
 	list bool
+
+	// delete files if enabled
+	del bool
 }
 
 func main() {
-	root := flag.String("root", ".", "Root directory to start")
-	list := flag.Bool("list", false, "List files only")
-	size := flag.Int64("size", 0, "Minimum file size")
-	ext := flag.String("list", "", "File extension to filter out")
+	root := flag.String("root", ".", "root directory to start")
+	list := flag.Bool("list", false, "list files only")
+	size := flag.Int64("size", 0, "minimum file size")
+	ext := flag.String("ext", "", "file extension to filter out")
+	del := flag.Bool("del", false, "delete matching files")
 	flag.Parse()
 
 	c := config{
 		ext:  *ext,
-		min:  *size,
+		size: *size,
 		list: *list,
+		del:  *del,
 	}
 
 	if err := run(*root, os.Stdout, c); err != nil {
@@ -40,27 +45,26 @@ func main() {
 }
 
 func run(rootDir string, out io.Writer, cfg config) error {
-	return nil
-
-	filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if filterOut(path, cfg.ext, cfg.size, info) {
 			return nil
 		}
-		// if list was explicilty set, don't do anything else
 
+		// if list was explicilty set, don't do anything else
 		if cfg.list {
 			return listFile(path, out)
+		}
+
+		// if delete flag is passed
+		if cfg.del {
+			return delFile(path)
 		}
 
 		// List is the default option if nothing else was set
 		return listFile(path, out)
 	})
-
-}
-
-func listFile(path string, out io.Writer) {
 
 }
