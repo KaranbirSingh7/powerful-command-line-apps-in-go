@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"testing"
+	"testing/iotest"
 )
 
 func TestOperations(t *testing.T) {
@@ -35,4 +39,89 @@ func TestOperations(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestCSV2Float(t *testing.T) {
+	csvData := `IP Address, Requests, Response Time
+192.168.0.199,2056,236
+192.168.0.88,899,220
+192.168.0.199,3054,226
+192.168.0.100,4133,218
+192.168.0.199,950,238
+`
+	testCases := []struct {
+		name   string
+		col    int
+		exp    []float64
+		expErr error
+		r      io.Reader
+	}{
+		{
+			name:   "Column 2",
+			col:    2,
+			exp:    []float64{2056, 899, 3054, 4133, 950},
+			expErr: nil,
+			r:      bytes.NewBufferString(csvData),
+		},
+		{
+			name:   "Column 3",
+			col:    3,
+			exp:    []float64{236, 220, 226, 218, 238},
+			expErr: nil,
+			r:      bytes.NewBufferString(csvData),
+		},
+		{
+			name:   "Fail Read",
+			col:    1,
+			exp:    nil,
+			expErr: iotest.ErrTimeout,
+			r:      iotest.TimeoutReader(bytes.NewReader([]byte{0})),
+		},
+		{
+			name:   "Fail Not Number",
+			col:    1,
+			exp:    nil,
+			expErr: ErrNotNumber,
+			r:      bytes.NewBufferString(csvData),
+		},
+		{
+			name:   "Failed Invalid Column",
+			col:    4,
+			exp:    nil,
+			expErr: ErrInvalidColumn,
+			r:      bytes.NewBufferString(csvData),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := csv2float(tc.r, tc.col)
+
+			// check if expect an error
+			if tc.expErr != nil {
+				// case when we expect and error but didn't get any
+				if err == nil {
+					t.Errorf("Expected error, got nil instead")
+				}
+				// check if error matches what we expect
+				if !errors.Is(err, tc.expErr) {
+					t.Errorf("Expected error %q, got %q instead", tc.expErr, err)
+				}
+				return // call off this test, move onto next one
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %q", err)
+			}
+
+			// match our expected col
+			for i, exp := range tc.exp {
+				if got[i] != exp {
+					t.Errorf("Expected %g, got %g instead", exp, got[i])
+				}
+			}
+
+		})
+	}
+
 }
