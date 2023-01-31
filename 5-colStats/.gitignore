@@ -5,3 +5,6 @@ testdata/benchmark
 
 # benchmark compiled binaries
 *.test
+
+# tracing out files
+trace*.out

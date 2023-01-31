@@ -44,6 +44,7 @@
     # ^$ is special symbol that ignore regular testCases
     ```
 
+### Benchmarking - Profiling
 
 1. Run benchmark with profiler enabled - CPU consumption based
     This will generate (2) files, 1 - your progra compiled binary and 2 - your profiling results that can be analyzed using `go tool pprof`
@@ -66,3 +67,16 @@
     go tool pprof mem00.pprof
     ```
 
+
+### Benchmarking - Tracing
+
+Tracing is used to detect blocking conditions inside codebase.
+
+1. Run benchmark with trace flag:
+    ```sh
+    # generate tracing binary
+    go test -bench=. -benchtime=10x -run=^$ -trace trace01.out
+
+    # use go tool to analyze [only works with chrome/chromium]
+    go tool trace trace01.out
+    ```
