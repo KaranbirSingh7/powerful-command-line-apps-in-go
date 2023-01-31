@@ -1,2 +1,7 @@
 bin
 colstat
+testdata/benchmark
+*.pprof
+
+# benchmark compiled binaries
+*.test
