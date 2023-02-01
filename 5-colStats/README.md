@@ -65,7 +65,14 @@
 
     # analyze using pprof
     go tool pprof mem00.pprof
+
+    # list top 10 memory consumptions
+    (pprof)> top 10
+    
+    # check how much memory is being used inside function
+    (pprof)> list csv2float
     ```
+    ![](./docs/img1.jpg)
 
 
 ### Benchmarking - Tracing
