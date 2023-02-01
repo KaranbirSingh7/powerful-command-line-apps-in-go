@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sync"
 )
 
@@ -12,7 +13,7 @@ var opFunc statsFunc
 
 func main() {
 	// verify flags and parse arguments
-	op := flag.String("op", "sum", "operation to run on selected column")
+	op := flag.String("op", "sum", "operation to run on selected column, valid options are 'sum', 'avg', 'min' and 'max'")
 	column := flag.Int("col", 1, "CSV column to run operation on")
 	flag.Parse()
 
@@ -39,6 +40,10 @@ func run(filenames []string, op string, column int, out io.Writer) error {
 		opFunc = sum
 	case "avg":
 		opFunc = avg
+	case "min":
+		opFunc = min
+	case "max":
+		opFunc = max
 	default:
 		return fmt.Errorf("%w: %s", ErrInvalidOperation, op)
 	}
@@ -50,45 +55,56 @@ func run(filenames []string, op string, column int, out io.Writer) error {
 	resCh := make(chan []float64)
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
+	filesCh := make(chan string)
+
+	// loop through all files sending them through channel
+	// so that each one is processed when worker is available
+	go func() {
+		defer close(filesCh)
+		for _, fname := range filenames {
+			filesCh <- fname
+		}
+	}()
 
 	wg := sync.WaitGroup{}
 
-	// loop through all filenames
-	for _, fname := range filenames {
+	// following for condition ensures that we are only running N number of goroutines at a time.
+	// where N == number of CPUs
+	for i := 0; i < runtime.NumCPU(); i++ {
 		// increase wg counter
 		wg.Add(1)
 
-		go func(fname string) {
+		go func() {
 			defer wg.Done() // decrease counter
 
-			// Open the file for reading
-			f, err := os.Open(fname)
-			if err != nil {
-				errCh <- fmt.Errorf("cannot open file: %w", err)
-				return // halt
+			for fname := range filesCh { // for listens to channel until its closed
+				// Open the file for reading
+				f, err := os.Open(fname)
+				if err != nil {
+					errCh <- fmt.Errorf("cannot open file: %w", err)
+					return // halt
+				}
+
+				// Parse the CSV into a slice of float64 number
+				data, err := csv2float(f, column)
+				if err != nil {
+					errCh <- err
+				}
+
+				// close file to release resources
+				if err := f.Close(); err != nil {
+					errCh <- err
+				}
+
+				// append slices to master
+				// appending to array could cause a race condition to appear since multiple goroutines can be accessing/modifying same variable
+				// consolidate = append(consolidate, data...)
+
+				resCh <- data // let responseChannel handle stream of data
+
 			}
-
-			// Parse the CSV into a slice of float64 number
-			data, err := csv2float(f, column)
-			if err != nil {
-				errCh <- err
-			}
-
-			// close file to release resources
-			if err := f.Close(); err != nil {
-				errCh <- err
-			}
-
-			// append slices to master
-			// appending to array could cause a race condition to appear since multiple goroutines can be accessing/modifying same variable
-			// consolidate = append(consolidate, data...)
-
-			resCh <- data // let responseChannel handle stream of data
-
-		}(fname)
-
+		}()
 	}
-
 	go func() {
 		wg.Wait()     // wait for goroutines to finish
 		close(doneCh) // close the doneCh signifying that work has been completed.
