@@ -24,6 +24,30 @@ func avg(data []float64) float64 {
 	return sum(data) / float64(len(data))
 }
 
+// min - minimum number in a list
+func min(data []float64) float64 {
+	minNum := data[0] // take first element as a starting point
+
+	for i := 0; i < len(data); i++ {
+		if data[i] < minNum {
+			minNum = data[i]
+		}
+	}
+	return minNum
+}
+
+// max - returns maximum number in a list
+func max(data []float64) float64 {
+	maxNum := data[0] // take first element as a starting point
+
+	for i := 0; i < len(data); i++ {
+		if data[i] > maxNum {
+			maxNum = data[i]
+		}
+	}
+	return maxNum
+}
+
 // csv2float - reads csv data from reader and return slice of floats
 func csv2float(r io.Reader, column int) ([]float64, error) {
 	// new CSV reader used to read data from CSV files
