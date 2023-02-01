@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func BenchmarkRun(b *testing.B) {
+func BenchmarkRunAvg(b *testing.B) {
 	filenames, err := filepath.Glob("testdata/benchmark/*.csv")
 	if err != nil {
 		b.Fatal(err)
@@ -20,6 +20,38 @@ func BenchmarkRun(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		if err := run(filenames, "avg", 2, io.Discard); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkRunMin(b *testing.B) {
+	filenames, err := filepath.Glob("testdata/benchmark/*.csv")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// IMPORTANT: ResetTimer ensures that any time used for preparing tests is reset
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if err := run(filenames, "min", 2, io.Discard); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkRunMax(b *testing.B) {
+	filenames, err := filepath.Glob("testdata/benchmark/*.csv")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// IMPORTANT: ResetTimer ensures that any time used for preparing tests is reset
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if err := run(filenames, "max", 2, io.Discard); err != nil {
 			b.Error(err)
 		}
 	}
