@@ -9,3 +9,4 @@
 - Table Driven Tests provide good coverage for most part.
 - Don't use `ioutil` because its depreciated. Use `io` or `os` pkg.
 - `testdata` directory is ignored when compiling go code.
+- use packaged `go tool pprof` for profiling go apps and `go tool trace` for tracing.
