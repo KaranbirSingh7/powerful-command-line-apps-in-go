@@ -2,14 +2,57 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
+// for mocking exec.CommandContext
+func mockCmdContext(ctx context.Context, exe string, args ...string) *exec.Cmd {
+	cs := []string{
+		"-test.run=TestHelperProcess",
+	}
+	cs = append(cs, exe)
+	cs = append(cs, args...)
+
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+
+	// to ensure that test isn't skipped
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	return cmd
+}
+
+func mockCmdTimeout(ctx context.Context, exe string, args ...string) *exec.Cmd {
+
+	cmd := mockCmdContext(ctx, exe, args...)
+
+	// to ensure that timeout is ON
+	cmd.Env = append(cmd.Env, "GO_HELPER_TIMEOUT=1")
+	return cmd
+}
+
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	// if timeout is enabled, simulate a timeout of 15s
+	if os.Getenv("GO_HELPER_TIMEOUT") == "1" {
+		time.Sleep(15 * time.Second)
+	}
+
+	if os.Args[2] == "git" {
+		fmt.Fprintln(os.Stdout, "Everything up-to-date")
+		os.Exit(0)
+	}
+	os.Exit(1)
+}
+
+// setupGit - a test helper func to setup a temporary git repository
 func setupGit(t *testing.T, proj string) func() {
 	t.Helper() // this is a helper function that can be called inside other test(s), this helps with errors line numbers.
 
@@ -74,40 +117,77 @@ func setupGit(t *testing.T, proj string) func() {
 }
 
 func TestRun(t *testing.T) {
+	// following are NOT required since we now have to ability to mock external commands incld. git
+	// _, err := exec.LookPath("git")
+	// if err != nil {
+	// 	t.Skip("Git not installed, Skipping test.")
+	// }
 	testCases := []struct {
-		name   string
-		proj   string
-		out    string
-		expErr error
+		name     string
+		proj     string
+		out      string
+		expErr   error
+		setupGit bool
+		mockCmd  func(ctx context.Context, name string, arg ...string) *exec.Cmd
 	}{
 		{
-			name:   "success",
-			proj:   "./testdata/tool/",
-			out:    "Go Build: SUCCESS\nGo Test: SUCCESS\nGofmt: SUCCESS\nGit Push: SUCCESS\n",
-			expErr: nil,
+			name:     "success",
+			proj:     "./testdata/tool/",
+			out:      "Go Build: SUCCESS\nGo Test: SUCCESS\nGofmt: SUCCESS\nGit Push: SUCCESS\n",
+			expErr:   nil,
+			setupGit: true,
+			mockCmd:  nil,
 		},
 		{
-			name:   "fail",
-			proj:   "./testdata/toolErr/",
-			out:    "",
-			expErr: &stepErr{step: "go build"},
+			name:     "successMock",
+			proj:     "./testdata/tool/",
+			out:      "Go Build: SUCCESS\nGo Test: SUCCESS\nGofmt: SUCCESS\nGit Push: SUCCESS\n",
+			expErr:   nil,
+			setupGit: false,
+			mockCmd:  mockCmdContext,
 		},
 		{
-			name:   "failFormat",
-			proj:   "./testdata/toolFmtErr/",
-			out:    "",
-			expErr: &stepErr{step: "go fmt"},
+			name:     "fail",
+			proj:     "./testdata/toolErr/",
+			out:      "",
+			expErr:   &stepErr{step: "go build"},
+			setupGit: false,
+			mockCmd:  nil,
 		},
-		// {
-		// 	name:   "failTimeout",
-		// 	proj:   "./testdata/tool",
-		// 	out:    "",
-		// 	expErr: &stepErr{step: "sleep 11"},
-		// },
+		{
+			name:     "failFormat",
+			proj:     "./testdata/toolFmtErr/",
+			out:      "",
+			expErr:   &stepErr{step: "go fmt"},
+			setupGit: false,
+		},
+		{
+			name:     "failTimeout",
+			proj:     "./testdata/tool",
+			out:      "",
+			expErr:   context.DeadlineExceeded,
+			setupGit: false,
+			mockCmd:  mockCmdTimeout,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// setup a temporary git repo if enabled in test case
+			if tc.setupGit {
+				// check if git cli is present
+				_, err := exec.LookPath("git")
+				if err != nil {
+					t.Skip("Git not installed. Skipping test.")
+				}
+				cleanup := setupGit(t, tc.proj)
+				defer cleanup() // remove temp directories when func is closing
+			}
+
+			if tc.mockCmd != nil {
+				command = tc.mockCmd
+			}
+
 			var out bytes.Buffer
 
 			err := run(tc.proj, &out)
@@ -116,6 +196,7 @@ func TestRun(t *testing.T) {
 			if tc.expErr != nil {
 				if err == nil {
 					t.Errorf("Expected error: %q. Got 'nil' instead.", tc.expErr)
+					return
 				}
 				if !errors.Is(err, tc.expErr) {
 					t.Errorf("Expected error: %q. Got %q.", tc.expErr, err)
