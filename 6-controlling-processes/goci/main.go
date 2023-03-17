@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -61,19 +63,42 @@ func run(proj string, out io.Writer) error {
 		10*time.Second,
 	)
 
-	for _, s := range pipeline {
-		msg, err := s.execute()
-		if err != nil {
-			return err
-		}
+	// handle os interrupt signals (size 1)
+	sig := make(chan os.Signal, 1)
+	errCh := make(chan error)   // error channel should always be unbuffered
+	done := make(chan struct{}) // work done signal kinda channel
 
-		_, err = fmt.Fprintln(out, msg)
-		if err != nil {
-			return err
-		}
+	// relay signal
+	// this creates a link b/w system signals and our channel
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
+	go func() {
+		for _, s := range pipeline {
+			msg, err := s.execute()
+			if err != nil {
+				errCh <- err
+				return
+			}
+			_, err = fmt.Fprintln(out, msg)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+		close(done) // close our done channel
+	}()
+
+	// blocking forever for loop
+	for {
+		select {
+		case rec := <-sig:
+			signal.Stop(sig) //stop listening fot anymore signals
+			return fmt.Errorf("%s: Exiting: %w", rec, ErrSignal)
+		case err := <-errCh:
+			return err // any error mean we halt func and return it back
+		case <-done:
+			return nil // clean function exit
+		}
 	}
-
-	return nil
 
 }

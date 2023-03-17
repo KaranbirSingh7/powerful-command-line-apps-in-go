@@ -5,9 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -28,7 +31,6 @@ func mockCmdContext(ctx context.Context, exe string, args ...string) *exec.Cmd {
 }
 
 func mockCmdTimeout(ctx context.Context, exe string, args ...string) *exec.Cmd {
-
 	cmd := mockCmdContext(ctx, exe, args...)
 
 	// to ensure that timeout is ON
@@ -212,6 +214,68 @@ func TestRun(t *testing.T) {
 			// validate output
 			if out.String() != tc.out {
 				t.Errorf("Expected output: %q, Got %q.", tc.out, out.String())
+			}
+		})
+	}
+}
+
+func TestRunKill(t *testing.T) {
+	var testCases = []struct {
+		name   string
+		proj   string
+		sig    syscall.Signal
+		expErr error
+	}{
+		{"SIGINT", "./testdata/tool", syscall.SIGINT, ErrSignal},   // we handle this signal
+		{"SIGTERM", "./testdata/tool", syscall.SIGTERM, ErrSignal}, // we handle this signal
+		{"SIGQUIT", "./testdata/tool", syscall.SIGQUIT, nil},       // we do NOT handle this anywhere /shrug
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			command = mockCmdTimeout
+
+			errCh := make(chan error)
+			ignSigCh := make(chan os.Signal, 1)
+			expSigCh := make(chan os.Signal, 1)
+
+			signal.Notify(ignSigCh, syscall.SIGQUIT) // listen for signal
+			defer signal.Stop(ignSigCh)              // stop listening for signals
+
+			signal.Notify(expSigCh, tc.sig) // listen
+			defer signal.Stop(expSigCh)     // stop listening
+
+			// background test our func
+			go func() {
+				errCh <- run(tc.proj, io.Discard)
+			}()
+
+			// use kill signal after 2 seconds has passed
+			go func() {
+				time.Sleep(2 * time.Second)
+				syscall.Kill(syscall.Getpid(), tc.sig)
+			}()
+
+			select {
+			// if we get an error on channel
+			case err := <-errCh:
+				if err == nil {
+					t.Errorf("Expected error. Got nil instead.")
+					return
+				}
+				if !errors.Is(err, tc.expErr) {
+					t.Errorf("Expected error: %q. Got %q", tc.expErr, err)
+				}
+				// check what kind of error we expecting
+				select {
+				case rec := <-expSigCh:
+					if rec != tc.sig {
+						t.Errorf("Expected signal %q, got %q", tc.sig, rec)
+					}
+				default:
+					t.Errorf("Signal not received")
+				}
+			case <-ignSigCh:
 			}
 		})
 	}
