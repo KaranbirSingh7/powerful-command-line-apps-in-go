@@ -1,18 +1,50 @@
 package scan
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"os"
 	"sort"
 )
 
 var (
-	ErrExists   = fmt.Errorf("Host already in the list")
-	ErrNotExist = fmt.Errorf("Host not in the list")
+	ErrExists   = fmt.Errorf("host already in the list")
+	ErrNotExist = fmt.Errorf("host not in the list")
 )
 
 // HostsList represents a list of hosts to run port scan on
 type HostsList struct {
 	Hosts []string
+}
+
+// Save saves hosts to a hosts file
+func (hl *HostsList) Save(hostsFile string) error {
+	output := "" // single string to carry all data seperated by \n
+	for _, h := range hl.Hosts {
+		output += fmt.Sprintln(h)
+	}
+	return os.WriteFile(hostsFile, []byte(output), 0644) // write to file and return error if any
+}
+
+// Load - read and load hosts file content as slice of string
+func (hl *HostsList) Load(hostsFile string) error {
+	f, err := os.Open(hostsFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close() // memory leak prevent
+
+	// new scanner of file, read line by line and add to file
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		hl.Hosts = append(hl.Hosts, scanner.Text())
+	}
+
+	return nil
 }
 
 // Add - adds a host to the list
