@@ -7,6 +7,55 @@ import (
 	"github.com/karanbirsingh7/pscan/scan"
 )
 
+func TestRemove(t *testing.T) {
+	testCases := []struct {
+		name      string
+		host      string
+		expectLen int
+		expectErr error
+	}{
+		{"RemoveExisting", "host1", 1, nil},
+		{"RemoveNotFound", "host3", 1, scan.ErrNotExist},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hl := &scan.HostsList{}
+
+			// init the list
+			for _, h := range []string{"host1", "host2"} {
+				if err := hl.Add(h); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			err := hl.Remove(tc.host)
+			if tc.expectErr != nil {
+				if err == nil {
+					t.Fatalf("Expected error, got nil instead\n")
+				}
+
+				if !errors.Is(err, tc.expectErr) {
+					t.Errorf("Expected error %q, got %q instead\n", tc.expectErr, err)
+				}
+				return // halt execution
+			}
+
+			if err != nil {
+				t.Errorf("Expected no error but got %q", err)
+			}
+
+			// assert length
+			if len(hl.Hosts) != tc.expectLen {
+				t.Errorf("Expected list length %d, got %d instead\n", tc.expectLen, len(hl.Hosts))
+			}
+			if hl.Hosts[0] == tc.host {
+				t.Errorf("Host name %q should not be in the list\n", tc.host)
+			}
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	testCases := []struct {
 		name      string
