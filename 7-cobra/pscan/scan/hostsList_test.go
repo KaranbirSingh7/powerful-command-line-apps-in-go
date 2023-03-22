@@ -2,10 +2,58 @@ package scan_test // we going to test this as an outsider
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/karanbirsingh7/pscan/scan"
 )
+
+func TestLoadNoFile(t *testing.T) {
+	tf, err := os.CreateTemp("", "")
+	if err != nil {
+		t.Errorf("Error when creating temp file: %s", err)
+	}
+	if err := os.Remove(tf.Name()); err != nil {
+		t.Fatalf("Error deleting temp file: %s", err)
+	}
+
+	hl := &scan.HostsList{}
+
+	if err := hl.Load(tf.Name()); err != nil {
+		t.Errorf("Expected no error, got %q instead\n", err)
+	}
+
+}
+
+func TestSaveLoad(t *testing.T) {
+	hl1 := scan.HostsList{}
+	hl2 := scan.HostsList{}
+
+	hostName := "host1"
+
+	hl1.Add(hostName)
+
+	// create a temporary file
+	tf, err := os.CreateTemp("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tf.Name()) // delete temp file afterwards
+
+	// save
+	if err := hl1.Save(tf.Name()); err != nil {
+		t.Fatalf("Error saving list to file: %s", err)
+	}
+
+	// load
+	if err := hl2.Load(tf.Name()); err != nil {
+		t.Fatalf("Error when loading data from file: %s", err)
+	}
+
+	if hl1.Hosts[0] != hl2.Hosts[0] {
+		t.Errorf("Host %q should match %q host.", hl1.Hosts[0], hl2.Hosts[0])
+	}
+}
 
 func TestRemove(t *testing.T) {
 	testCases := []struct {
