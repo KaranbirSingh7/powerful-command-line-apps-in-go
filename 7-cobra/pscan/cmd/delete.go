@@ -15,7 +15,7 @@ import (
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
-	Use:   "delete",
+	Use:   "delete <host1>...<hostN>",
 	Short: "A brief description of your command",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		hostsFile, err := cmd.Flags().GetString("hosts-file")

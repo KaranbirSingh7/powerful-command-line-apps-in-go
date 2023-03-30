@@ -22,6 +22,7 @@ var addCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		hostsFile, err := cmd.Flags().GetString("hosts-file")
+		fmt.Println(hostsFile)
 		if err != nil {
 			return err
 		}
