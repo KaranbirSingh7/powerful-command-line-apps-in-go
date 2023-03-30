@@ -15,9 +15,9 @@ type PortState struct {
 type state bool
 
 type Results struct {
-	Host      string
-	NotFound  bool //whether we can resolve into an IPv4 addresss
-	PortState []PortState
+	Host       string
+	NotFound   bool //whether we can resolve into an IPv4 addresss
+	PortStates []PortState
 }
 
 // Run performs a port scan on the hosts list
@@ -36,7 +36,7 @@ func Run(hl *HostsList, ports []int) []Results {
 
 		// scan ports and append results
 		for _, p := range ports {
-			r.PortState = append(r.PortState, scanPort(r.Host, p, 1*time.Second))
+			r.PortStates = append(r.PortStates, scanPort(r.Host, p, 1*time.Second))
 		}
 
 		res = append(res, r)

@@ -76,15 +76,15 @@ func TestRunHostFound(t *testing.T) {
 		t.Errorf("Expected host %q to be found\n", host)
 	}
 
-	if len(res[0].PortState) != 2 {
-		t.Fatalf("Expected 2 port states, got %d instead\n", len(res[0].PortState))
+	if len(res[0].PortStates) != 2 {
+		t.Fatalf("Expected 2 port states, got %d instead\n", len(res[0].PortStates))
 	}
 
 	for i, tc := range testCases {
-		if res[0].PortState[i].Port != ports[i] {
-			t.Errorf("Expected port %d, got %d instead\n", ports[0], res[0].PortState[i].Port)
+		if res[0].PortStates[i].Port != ports[i] {
+			t.Errorf("Expected port %d, got %d instead\n", ports[0], res[0].PortStates[i].Port)
 		}
-		if res[0].PortState[i].Open.String() != tc.expectState {
+		if res[0].PortStates[i].Open.String() != tc.expectState {
 			t.Errorf("Expected port %d to be %s\n", ports[i], tc.expectState)
 		}
 	}
@@ -105,4 +105,32 @@ func TestStateString(t *testing.T) {
 		t.Errorf("Expected %q, got %q", "open", ps.Open.String())
 	}
 
+}
+
+func TestRunHostNotFound(t *testing.T) {
+	host := "389.389.389.389" // non existing host in IPV4 range
+	hl := &scan.HostsList{}
+
+	hl.Add(host) // add to our list
+
+	// since host is non-existent, there is no need to pass any ports because it would never go to that point ever
+	res := scan.Run(hl, []int{})
+
+	if len(res) != 1 {
+		t.Fatalf("Expected 1 results, got %d instead\n", len(res))
+	}
+
+	if res[0].Host != host {
+		t.Errorf("Expected host %q, got %q instead\n", host, res[0].Host)
+	}
+
+	// host was non-existent so it should retur NOTFOUND
+	if !res[0].NotFound {
+		t.Errorf("Expected host %q NOT to be found\n", host)
+	}
+
+	// no ports passed so not expected in return
+	if len(res[0].PortStates) != 0 {
+		t.Fatalf("Expected 0 port states, got %d instead\n", len(res[0].PortStates))
+	}
 }
