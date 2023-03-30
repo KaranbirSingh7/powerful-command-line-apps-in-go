@@ -60,7 +60,7 @@ func printResults(out io.Writer, results []scan.Results) error {
 		message += fmt.Sprintln()
 	}
 
-	_, err := fmt.Fprintln(out, message)
+	_, err := fmt.Fprint(out, message)
 	return err
 }
 
