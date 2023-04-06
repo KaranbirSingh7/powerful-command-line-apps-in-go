@@ -11,6 +11,7 @@ import (
 
 	"github.com/karanbirsingh7/pscan/scan"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // scanCmd represents the scan command
@@ -18,10 +19,7 @@ var scanCmd = &cobra.Command{
 	Use:   "scan --ports/-p=8080,443,3000",
 	Short: "Run a port scan on hosts",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		hostsFile, err := cmd.Flags().GetString("hosts-file")
-		if err != nil {
-			return err
-		}
+		hostsFile := viper.GetString("hosts-file")
 		ports, err := cmd.Flags().GetIntSlice("ports")
 		if err != nil {
 			return err
