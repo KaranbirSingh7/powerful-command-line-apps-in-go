@@ -24,6 +24,16 @@ var scanCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// too lazy to do this
+		_, err = cmd.Flags().GetString("ports-range")
+		if err != nil {
+			return err
+		}
+
+		// should we scan default ports or ports-range?
+		// scan ports-range alongside default ports to be on safe side
+
 		return scanAction(os.Stdout, hostsFile, ports)
 	},
 }
@@ -33,6 +43,7 @@ func scanAction(out io.Writer, hostsFile string, ports []int) error {
 	if err := hl.Load(hostsFile); err != nil {
 		return err
 	}
+
 	results := scan.Run(hl, ports)
 	return printResults(out, results)
 }
@@ -64,5 +75,8 @@ func printResults(out io.Writer, results []scan.Results) error {
 
 func init() {
 	rootCmd.AddCommand(scanCmd)
+	// --ports=80,443
 	scanCmd.Flags().IntSliceP("ports", "p", []int{22, 80, 443}, "ports to scan")
+	// --ports-range=1-1024
+	// scanCmd.Flags().StringP("ports-range", "pr", "", "port range to scan. ex: 80-443")
 }
